@@ -1,0 +1,121 @@
+import tkinter as tk
+from tkinter import messagebox
+from theme import THEME
+from logic import calculate_need, is_safe_state
+
+
+class BankersAlgorithmGUI:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Advanced Banker's Algorithm - Deadlock Prevention")
+        self.root.geometry("950x750")
+        self.root.configure(bg=THEME["bg_color"])
+
+        self.process_count = 0
+        self.resource_count = 0
+
+        self.entries_allocation = []
+        self.entries_max = []
+        self.entries_available = []
+
+        self.setup_main_input()
+
+    def styled_label(self, text, row, column, **kwargs):
+        tk.Label(self.root, text=text, bg=THEME["bg_color"], fg=THEME["fg_color"], font=THEME["font"],
+                 **kwargs).grid(row=row, column=column, sticky="w", pady=2)
+
+    def styled_entry(self, row, column, width=5):
+        e = tk.Entry(self.root, width=width, bg=THEME["entry_bg"], fg=THEME["entry_fg"], font=THEME["font"])
+        e.grid(row=row, column=column, padx=2, pady=2)
+        return e
+
+    def styled_button(self, text, command, row, column, colspan=1):
+        tk.Button(self.root, text=text, command=command, bg=THEME["button_color"], fg=THEME["fg_color"],
+                  font=THEME["font"]).grid(row=row, column=column, columnspan=colspan, pady=5)
+
+    def setup_main_input(self):
+        self.styled_label("Number of Processes:", 0, 0)
+        self.entry_processes = self.styled_entry(0, 1)
+
+        self.styled_label("Number of Resource Types:", 1, 0)
+        self.entry_resources = self.styled_entry(1, 1)
+
+        self.styled_button("Submit", self.create_matrix_inputs, 2, 0, 2)
+
+    def create_matrix_inputs(self):
+        try:
+            self.process_count = int(self.entry_processes.get())
+            self.resource_count = int(self.entry_resources.get())
+        except ValueError:
+            messagebox.showerror("Error", "Enter valid integers.")
+            return
+
+        for widget in self.root.winfo_children()[3:]:
+            widget.destroy()
+
+        self.entries_allocation.clear()
+        self.entries_max.clear()
+        self.entries_available.clear()
+
+        self.styled_label("Allocation Matrix", 3, 0)
+        for i in range(self.process_count):
+            row_entries = []
+            for j in range(self.resource_count):
+                entry = self.styled_entry(4 + i, j)
+                row_entries.append(entry)
+            self.entries_allocation.append(row_entries)
+
+        self.styled_label("Maximum Matrix", 4 + self.process_count, 0)
+        for i in range(self.process_count):
+            row_entries = []
+            for j in range(self.resource_count):
+                entry = self.styled_entry(5 + self.process_count + i, j)
+                row_entries.append(entry)
+            self.entries_max.append(row_entries)
+
+        self.styled_label("Available Resources:", 5 + self.process_count * 2, 0)
+        for j in range(self.resource_count):
+            entry = self.styled_entry(5 + self.process_count * 2, 1 + j)
+            self.entries_available.append(entry)
+
+        self.styled_button("Run Banker's Algorithm", self.run_bankers, 6 + self.process_count * 2, 0, 3)
+        self.styled_button("Reset", self.reset_all, 7 + self.process_count * 2, 0, 3)
+
+        self.need_label = tk.Label(self.root, text="", fg="blue", bg=THEME["bg_color"], font=THEME["font"], justify="left")
+        self.need_label.grid(row=8 + self.process_count * 2, column=0, columnspan=6, sticky="w")
+
+    def reset_all(self):
+        """Reset the entire GUI to the initial state."""
+        for widget in self.root.winfo_children():
+            widget.destroy()
+        self.__init__(self.root)
+
+    def parse_matrices(self):
+        try:
+            allocation = [[int(e.get()) for e in row] for row in self.entries_allocation]
+            maximum = [[int(e.get()) for e in row] for row in self.entries_max]
+            available = [int(e.get()) for e in self.entries_available]
+            return allocation, maximum, available
+        except Exception as e:
+            messagebox.showerror("Error", f"Invalid input: {e}")
+            return None, None, None
+
+    def display_need_matrix(self, need):
+        text = "Need Matrix:\n"
+        for i, row in enumerate(need):
+            text += f"P{i}: {row}\n"
+        self.need_label.config(text=text)
+
+    def run_bankers(self):
+        allocation, maximum, available = self.parse_matrices()
+        if allocation is None:
+            return
+
+        need = calculate_need(maximum, allocation)
+        self.display_need_matrix(need)
+
+        safe, sequence = is_safe_state(allocation, need, available)
+        if safe:
+            messagebox.showinfo("SAFE", f"System is in a SAFE state.\nSafe Sequence: {' → '.join(f'P{p}' for p in sequence)}")
+        else:
+            messagebox.showwarning("UNSAFE", "System is in an UNSAFE state. Deadlock possible.")
